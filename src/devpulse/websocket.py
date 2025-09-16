@@ -81,12 +81,26 @@ def send_event(event: Dict[str, Any]) -> None:
         event: The event to send
     """
     try:
-        # Add event to queue
-        asyncio.create_task(_event_queue.put_nowait(event))
+        # Try to get the current event loop
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're in an async context, create a task to put the event in the queue
+                loop.create_task(_event_queue.put(event))
+            else:
+                # We're in a sync context with an event loop, use run_until_complete
+                loop.run_until_complete(_event_queue.put(event))
+        except RuntimeError:
+            # No event loop in this thread, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(_event_queue.put(event))
+            # Don't close the loop as it might be needed later
     except asyncio.QueueFull:
         logger.warning("Event queue full, dropping event")
     except Exception as e:
         logger.error(f"Error sending event: {str(e)}")
+        # Silently continue on error to prevent application disruption
 
 
 async def start_websocket_server(host: str = "0.0.0.0", port: int = 8000) -> None:

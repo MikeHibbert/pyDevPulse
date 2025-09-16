@@ -17,7 +17,7 @@ EXPOSE 8008
 EXPOSE 8088
 
 # Create a startup script
-RUN echo "import asyncio\nfrom devpulse.websocket import start_websocket_server\nfrom devpulse.web_ui import start_web_ui\n\nasync def start_servers():\n    # Start both servers concurrently\n    await asyncio.gather(\n        start_websocket_server(host='0.0.0.0', port=8008),\n        start_web_ui(host='0.0.0.0', port=8088)\n    )\n\nasyncio.run(start_servers())" > /app/start_servers.py
+RUN echo 'import asyncio\nimport os\nfrom devpulse import init\nfrom devpulse.websocket import start_websocket_server\nfrom devpulse.web_ui import start_web_ui\nfrom devpulse.database import init_database\n\nasync def start_servers():\n    print("Starting DevPulse servers...")\n    # Initialize DevPulse with database configuration\n    db_url = os.getenv("DEVPULSE_DB_URL", "sqlite:///app/data/devpulse_fresh.db")\n    print(f"Initializing DevPulse with database URL: {db_url}")\n    init(\n        websocket_url="ws://localhost:8008",\n        enable_db_logging=True,\n        db_url=db_url,\n        environment="production"\n    )\n    \n    # Initialize database\n    print("Initializing database...")\n    init_database()\n    print("DevPulse initialization complete")\n    \n    # Start both servers concurrently\n    print("Starting WebSocket server on port 8008 and Web UI on port 8088")\n    await asyncio.gather(\n        start_websocket_server(host="0.0.0.0", port=8008),\n        start_web_ui(host="0.0.0.0", port=8088)\n    )\n\nif __name__ == "__main__":\n    asyncio.run(start_servers())' > /app/start_servers.py
 
 # Command to run both servers
 CMD ["python", "/app/start_servers.py"]

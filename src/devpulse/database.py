@@ -46,8 +46,29 @@ def init_database() -> None:
         db_url = "sqlite:///:memory:"
 
     try:
-        # Create engine
-        _engine = create_engine(db_url)
+        # Create engine with WAL mode for concurrent access
+        if db_url.startswith("sqlite"):
+            _engine = create_engine(
+                db_url,
+                connect_args={
+                    "check_same_thread": False,
+                    "timeout": 30
+                },
+                pool_pre_ping=True,
+                pool_recycle=300
+            )
+            
+            # Enable WAL mode for concurrent access
+            @sqlalchemy.event.listens_for(_engine, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute("PRAGMA cache_size=10000")
+                cursor.execute("PRAGMA temp_store=MEMORY")
+                cursor.close()
+        else:
+            _engine = create_engine(db_url)
 
         # Create tables
         _Base.metadata.create_all(_engine)
@@ -171,6 +192,76 @@ def get_events(
         return result
     except Exception as e:
         logger.error(f"Failed to get events from database: {str(e)}")
+        return []
+    finally:
+        # Close session
+        session.close()
+
+
+def get_recent_trace_ids(limit: int = 20) -> List[Dict[str, Any]]:
+    """Get recent trace IDs with their latest event information.
+
+    Args:
+        limit: Maximum number of trace IDs to return
+
+    Returns:
+        A list of trace ID information with latest event details
+    """
+    global _Session
+
+    # Initialize database if not already initialized
+    if _Session is None:
+        init_database()
+        if _Session is None:
+            logger.error("Failed to initialize database, cannot get recent trace IDs")
+            return []
+
+    try:
+        # Create session
+        session = _Session()
+
+        # Query to get distinct trace IDs with their latest event
+        from sqlalchemy import func, desc
+        
+        # Subquery to get the latest timestamp for each trace_id
+        latest_events = session.query(
+            Event.trace_id,
+            func.max(Event.timestamp).label('latest_timestamp')
+        ).group_by(Event.trace_id).subquery()
+
+        # Join with the main events table to get full event details
+        query = session.query(Event).join(
+            latest_events,
+            (Event.trace_id == latest_events.c.trace_id) &
+            (Event.timestamp == latest_events.c.latest_timestamp)
+        ).order_by(desc(Event.timestamp)).limit(limit)
+
+        # Execute query
+        events = query.all()
+
+        # Convert to dictionaries with trace summary
+        result = []
+        for event in events:
+            try:
+                payload = json.loads(event.payload)
+                
+                # Get event count for this trace
+                event_count = session.query(Event).filter(Event.trace_id == event.trace_id).count()
+                
+                result.append({
+                    'trace_id': event.trace_id,
+                    'latest_timestamp': event.timestamp.isoformat(),
+                    'system': event.system,
+                    'event_type': event.event_type,
+                    'event_count': event_count,
+                    'latest_event': payload
+                })
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to decode event payload: {event.id}")
+
+        return result
+    except Exception as e:
+        logger.error(f"Failed to get recent trace IDs from database: {str(e)}")
         return []
     finally:
         # Close session

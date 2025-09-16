@@ -1,6 +1,20 @@
 version: '3'
 
 services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: devpulse
+      POSTGRES_USER: devpulse
+      POSTGRES_PASSWORD: devpulse123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - devpulse-network
+    restart: unless-stopped
+
   websocket:
     build:
       context: .
@@ -9,8 +23,15 @@ services:
       - "8008:8008"
       - "8088:8088"
     restart: unless-stopped
+    environment:
+      - DEVPULSE_DB_URL=postgresql://devpulse:devpulse123@postgres:5432/devpulse
+    depends_on:
+      - postgres
     networks:
       - devpulse-network
+
+volumes:
+  postgres_data:
 
 networks:
   devpulse-network:
