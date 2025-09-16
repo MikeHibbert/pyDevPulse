@@ -34,8 +34,8 @@ pip install devpulse
 ```python
 import devpulse
 
-# Initialize DevPulse with WebSocket URL
-devpulse.init(websocket_url="ws://localhost:8000/ws")
+# Initialize DevPulse with default Docker WebSocket URL (ws://localhost:8008)
+devpulse.init()
 
 # For FastAPI integration
 from fastapi import FastAPI
@@ -49,6 +49,32 @@ from devpulse.integrations import setup_celery_tracing
 
 setup_celery_tracing(celery_app)
 ```
+
+## Docker Support
+
+DevPulse includes Docker support for running the WebSocket server on port 8008 and the web UI on port 8088:
+
+```bash
+# Start the WebSocket server and web UI
+docker-compose up -d
+```
+
+## Web UI
+
+DevPulse provides a web-based user interface for viewing traces and events:
+
+- Access the web UI at http://localhost:8088
+- View all traces in a single dashboard
+- Inspect individual trace details and events
+
+## API Endpoints
+
+DevPulse offers API endpoints for programmatic access to trace data:
+
+- `/api/traces/{trace_id}` - Get all events for a specific trace ID
+- `/api/traces/{trace_id}/timeline` - Get a timeline of events organized by stages with duration and status information
+
+See the [usage documentation](docs/usage.md) for more details.
 
 ## Documentation
 

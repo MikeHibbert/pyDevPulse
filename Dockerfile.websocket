@@ -1,0 +1,23 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Copy requirements and install dependencies
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Copy the source code
+COPY . .
+
+# Install the package in development mode
+RUN pip install -e .
+
+# Expose the WebSocket and Web UI ports
+EXPOSE 8008
+EXPOSE 8088
+
+# Create a startup script
+RUN echo "import asyncio\nfrom devpulse.websocket import start_websocket_server\nfrom devpulse.web_ui import start_web_ui\n\nasync def start_servers():\n    # Start both servers concurrently\n    await asyncio.gather(\n        start_websocket_server(host='0.0.0.0', port=8008),\n        start_web_ui(host='0.0.0.0', port=8088)\n    )\n\nasyncio.run(start_servers())" > /app/start_servers.py
+
+# Command to run both servers
+CMD ["python", "/app/start_servers.py"]

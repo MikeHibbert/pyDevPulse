@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  websocket:
+    build:
+      context: .
+      dockerfile: Dockerfile.websocket
+    ports:
+      - "8008:8008"
+      - "8088:8088"
+    restart: unless-stopped
+    networks:
+      - devpulse-network
+
+networks:
+  devpulse-network:
+    driver: bridge

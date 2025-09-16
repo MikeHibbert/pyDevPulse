@@ -17,8 +17,116 @@ Initialize DevPulse in your application:
 ```python
 import devpulse
 
-# Initialize with WebSocket URL
+# Initialize with default Docker WebSocket URL (ws://localhost:8008)
+devpulse.init()
+
+# Or specify a custom WebSocket URL
 devpulse.init(websocket_url="ws://localhost:8000/ws")
+```
+
+## Docker WebSocket Server and Web UI
+
+DevPulse includes Docker support for running both the WebSocket server and web UI. This allows you to run the WebSocket server in a container on port 8008 (the default URL that DevPulse will connect to) and the web UI on port 8088.
+
+### Running with Docker Compose
+
+```bash
+# Start the WebSocket server and web UI
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the server
+docker-compose down
+```
+
+### Accessing the Web UI
+
+Once the Docker container is running, you can access the web UI at:
+
+```
+http://localhost:8088
+```
+
+The web UI provides a dashboard to view all traces and their events, making it easier to debug and monitor your application.
+
+### Building and Running Manually
+
+```bash
+# Build the Docker image
+docker build -f Dockerfile.websocket -t devpulse-websocket .
+
+# Run the container
+docker run -d -p 8008:8008 -p 8088:8088 --name devpulse-websocket devpulse-websocket
+```
+
+## API Endpoints
+
+DevPulse provides API endpoints for programmatic access to trace data:
+
+### Get Events for a Trace ID
+
+```
+GET /api/traces/{trace_id}
+```
+
+Returns all events associated with the specified trace ID.
+
+Example response:
+```json
+{
+  "trace_id": "abc123",
+  "events": [
+    {
+      "id": 1,
+      "trace_id": "abc123",
+      "system": "api",
+      "event_type": "request",
+      "timestamp": "2023-01-01T12:00:00Z",
+      "data": {...}
+    },
+    ...
+  ]
+}
+```
+
+### Get Timeline for a Trace ID
+
+```
+GET /api/traces/{trace_id}/timeline
+```
+
+Returns a timeline of events organized by stages with duration and status information.
+
+Example response:
+```json
+{
+  "trace_id": "abc123",
+  "stages": [
+    {
+      "system": "api",
+      "start_time": "2023-01-01T12:00:00Z",
+      "end_time": "2023-01-01T12:00:01Z",
+      "duration_ms": 1000,
+      "status": "success",
+      "event_count": 3,
+      "events": [...]
+    },
+    {
+      "system": "worker",
+      "start_time": "2023-01-01T12:00:01Z",
+      "end_time": "2023-01-01T12:00:03Z",
+      "duration_ms": 2000,
+      "status": "error",
+      "event_count": 2,
+      "events": [...]
+    }
+  ],
+  "total_stages": 2,
+  "has_errors": true,
+  "total_duration_ms": 3000
+}
 ```
 
 ## Trace ID Propagation
